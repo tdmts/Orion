@@ -1360,31 +1360,41 @@
          * @returns {Promise<boolean>} True if auto-login succeeded
          */
         async function tryAutoLogin() {
+            logDebug('Checking for an existing Brightspace session...');
+
             // Hide setup initially
             document.getElementById('emailSetup').style.display = 'none';
             showLoading('Checking user session...');
 
             try {
                 const response = await fetchWithTimeout('/d2l/api/lp/1.43/users/whoami');
+                logDebug(`Session whoami response status: ${response.status}`);
                 if (response.ok) {
                     const data = await response.json();
                     if (data.UniqueName) {
+                        logDebug('Existing session detected for: ' + data.UniqueName);
                         const savedSecret = localStorage.getItem(GRADER_SECRET_KEY);
                         if (savedSecret) {
+                            logDebug('Saved secret found - attempting auto-login');
                             console.log('Auto-detected user:', data.UniqueName);
                             return await authenticateUser(data.UniqueName, savedSecret);
                         }
+                        logDebug('No saved secret - falling back to manual entry');
                         document.getElementById('settings_email').value = data.UniqueName;
                         document.getElementById('settingsSection').open = true;
                     }
+                } else {
+                    logDebug('No existing Brightspace session');
                 }
             } catch (e) {
+                logDebug('Auto-login check failed: ' + e.message);
                 console.log('Auto-login check failed:', e);
             }
 
             // If we get here, auto-login failed
             hideLoading();
             document.getElementById('emailSetup').style.display = 'block';
+            logDebug('Auto-login did not complete - showing manual setup');
             return false;
         }
 
@@ -1394,9 +1404,11 @@
 
         // Load saved email on page load
         window.onload = async function() {
+            logDebug('Page loaded - Build ' + APP_VERSION);
             document.getElementById('appVersion').textContent = 'Build ' + APP_VERSION;
             loadSettingsFields();
             if (!getBearerEndpoint()) {
+                logDebug('No Get Bearer URL configured - opening Settings');
                 document.getElementById('settingsSection').open = true;
             }
 
@@ -1407,6 +1419,7 @@
                     document.getElementById('settingsSection').open = true;
                 }
                 document.getElementById('settings_email').focus();
+                logDebug('Waiting for manual Start Scanning');
             }
         }
     </script>
