@@ -372,7 +372,7 @@
         // CONFIGURATION - API URLs and Storage Keys
         // ====================================================================
 
-        const APP_VERSION = '1.0.0'; // Bump when releasing a new build of this page.
+        const APP_VERSION = '2026-09-03 15:20'; // Build timestamp. Set to the current date and time when releasing.
 
         const ANS_BEARER_KEY = 'ans_bearer_token'; // Do not change. Used for localStorage key.
         const GRADER_EMAIL_KEY = 'grader_email'; // Do not change. Used for localStorage key.
@@ -1277,7 +1277,7 @@
 
         // Load saved email on page load
         window.onload = async function() {
-            document.getElementById('appVersion').textContent = 'v' + APP_VERSION;
+            document.getElementById('appVersion').textContent = 'Build ' + APP_VERSION;
             document.getElementById('setupGetBearerUrl').value = getBearerEndpoint();
             document.getElementById('setupAnsStartTestUrl').value = getAnsStartTestEndpoint();
             if (!getBearerEndpoint()) {
