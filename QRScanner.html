@@ -664,22 +664,6 @@
             showResult('Settings saved. Use Change User if you updated the email or secret.', true, 'settings');
         }
 
-        function loadGraderEmail() {
-            const savedEmail = localStorage.getItem(GRADER_EMAIL_KEY);
-            if (savedEmail) {
-                document.getElementById('orion_email').value = savedEmail;
-                console.log('Grader email loaded from localStorage');
-            }
-        }
-
-        function saveGraderEmail() {
-            const emailValue = document.getElementById('orion_email').value;
-            if (emailValue) {
-                localStorage.setItem(GRADER_EMAIL_KEY, emailValue);
-                console.log('Grader email saved to localStorage');
-            }
-        }
-
         /**
          * Formats a Date object for datetime-local input field
          * @param {Date} date - The date to format
@@ -858,16 +842,28 @@
             });
         }
 
-        function cleanup() {
+        /**
+         * Stops and clears the active QR scanner instance, if any.
+         * Awaited before starting a new instance to avoid two scanners
+         * racing for the same camera/#reader element.
+         */
+        async function stopScanner() {
             if (html5QrCode && html5QrCode.isScanning) {
-                html5QrCode.stop().then(() => {
+                try {
+                    await html5QrCode.stop();
                     html5QrCode.clear();
-                });
+                } catch (err) {
+                    logDebug('Error stopping camera scanner: ' + err);
+                }
             }
         }
 
+        function cleanup() {
+            stopScanner();
+        }
+
         async function onScanSuccess(decodedText) {
-            html5QrCode.stop();
+            await stopScanner();
             document.getElementById('reader').style.display = 'none';
             document.getElementById('debugLog').innerHTML = '';
 
@@ -1321,7 +1317,7 @@
 
             const ansEndpoint = getAnsStartTestEndpoint();
             if (!ansEndpoint) {
-                showResult('No ANS Start Test URL configured. Set it under Endpoints on the setup screen.', false, 'ans');
+                showResult('No ANS Start Test URL configured. Set it under ⚙️ Settings.', false, 'ans');
                 return;
             }
 
