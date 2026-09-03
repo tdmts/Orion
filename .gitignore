@@ -1,0 +1,4 @@
+# Power Automate flow exports. These embed live credentials in
+# Microsoft.Flow/flows/*/definition.json (e.g. client_secret on the
+# token-refresh HTTP action), so keep every export out of the repo.
+*.zip

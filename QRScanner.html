@@ -1,0 +1,1269 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scan &amp; Grade</title>
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"
+            integrity="sha384-c9d8RFSL+u3exBOJ4Yp3HUJXS4znl9f+z66d1y54ig+ea249SpqR+w1wyvXz/lk+"
+            crossorigin="anonymous"></script>
+    <style>
+        .readspeaker-button,
+        .rsbtn,
+        [class*="readspeaker"],
+        [id*="readspeaker"] {
+            display: none !important;
+        }
+        
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 400px;
+            margin: 0 auto;
+            padding: 15px;
+            padding-bottom: 80px; /* Extra space for mobile browser bars */
+        }
+        
+        #reader {
+            width: 100%;
+            max-width: 350px;
+            margin: 0 auto 20px auto;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        
+        label {
+            display: block;
+            margin-top: 10px;
+            font-weight: bold;
+        }
+        
+        input {
+            width: 100%;
+            padding: 8px;
+            margin-top: 3px;
+            box-sizing: border-box;
+            font-size: 14px;
+        }
+        
+        button {
+            margin-top: 15px;
+            margin-bottom: 15px;
+            padding: 10px 15px;
+            background-color: #0078d4;
+            color: white;
+            border: none;
+            cursor: pointer;
+            width: 100%;
+            font-size: 14px;
+        }
+        
+        button:hover {
+            background-color: #005a9e;
+        }
+        
+        #scanAgain {
+            background-color: #666;
+        }
+        
+        #result {
+            margin-top: 15px;
+            padding: 20px;
+            border-radius: 4px;
+            font-size: 18px;
+            text-align: center;
+        }
+        
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 8px;
+        }
+
+        .form-row label {
+            margin-top: 0;
+        }
+
+        .form-row input {
+            margin-top: 0;
+        }
+        
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #0078d4;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+            vertical-align: middle;
+        }
+        
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+        
+        .loading-message {
+            display: none;
+            padding: 15px;
+            background-color: #e7f3ff;
+            color: #004a87;
+            border-radius: 4px;
+            border: 1px solid #b3d9ff;
+            margin-bottom: 20px;
+            font-weight: 500;
+        }
+        
+        .loading-message.show {
+            display: flex;
+            align-items: center;
+        }
+        
+        .result-container {
+            display: none;
+            padding: 15px;
+            border-radius: 4px;
+            border: 1px solid;
+            margin-bottom: 20px;
+            font-weight: 500;
+        }
+        
+        .result-container.show {
+            display: block;
+        }
+        
+        .result-container.success {
+            background-color: #d1edcc;
+            color: #155724;
+            border-color: #c3e6cb;
+        }
+        
+        .result-container.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border-color: #f5c6cb;
+        }
+        
+        details {
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            padding: 0;
+            margin-bottom: 8px;
+        }
+        
+        summary {
+            background: #f8f9fa;
+            padding: 8px 12px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 13px;
+            border-radius: 6px 6px 0 0;
+            user-select: none;
+        }
+        
+        summary:hover {
+            background: #e9ecef;
+        }
+        
+        details[open] summary {
+            border-bottom: 1px solid #ddd;
+            border-radius: 6px 6px 0 0;
+        }
+        
+        .expandable-content {
+            padding: 10px;
+        }
+        
+        .expandable-content label {
+            margin-top: 6px;
+            font-size: 13px;
+        }
+        
+        .expandable-content label:first-child {
+            margin-top: 0;
+        }
+        
+        .expandable-content input {
+            padding: 6px;
+            font-size: 13px;
+        }
+
+        #debugLog {
+            margin-top: 20px;
+            padding: 10px;
+            background: #eee;
+            border: 1px solid #999;
+            font-family: monospace;
+            font-size: 11px;
+            max-height: 300px;
+            overflow-y: auto;
+            word-break: break-all;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+
+<body>
+    <b>Scan &amp; Grade</b>
+
+    <div id="reader"></div>
+
+        <div id="emailSetup" style="display: block;">
+        <p>Enter your email address to begin:</p>
+        <label for="setupEmail">Your Email</label>
+        <input type="email" id="setupEmail" placeholder="Enter your email address">
+        <label for="setupSecret">Your Secret</label>
+        <input type="password" id="setupSecret" placeholder="Enter your secret">
+
+        <details id="endpointsSection" style="margin-top: 10px;">
+            <summary>⚙️ Endpoints (advanced)</summary>
+            <div class="expandable-content">
+                <label for="setupGetBearerUrl">Get Bearer URL</label>
+                <input type="text" id="setupGetBearerUrl" placeholder="Get Bearer flow URL">
+
+                <label for="setupAnsStartTestUrl">ANS Start Test URL</label>
+                <input type="text" id="setupAnsStartTestUrl" placeholder="ANS Start Test flow URL">
+            </div>
+        </details>
+
+        <button onclick="validateEmailAndStart()">Start Scanning</button>
+    </div>
+    
+    <div id="errorContainer" style="display: none; margin-bottom: 20px; padding: 15px; background-color: #f8d7da; color: #721c24; border-radius: 4px; border: 1px solid #f5c6cb;"></div>
+    <div id="loadingMessage" class="loading-message">
+        <div class="loading"></div>
+        <span id="loadingText">Loading...</span>
+    </div>
+    
+    <div id="scannerSection" style="display: none;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <span>Scanning as: <strong id="currentUser"></strong></span>
+            <button onclick="changeUser()" style="padding: 5px 10px; font-size: 12px; width: auto;">Change User</button>
+        </div>
+    </div>
+    
+    <div id="orionForm" style="display: none;">
+        <details open>
+            <summary>📧 Basic Info</summary>
+            <div class="expandable-content">
+                <label>Student e-mail</label>
+                <input type="email" id="orion_studentEmail" readonly>
+
+                <label>Assignment Shortname</label>
+                <input type="text" id="orion_assignmentShortname" readonly>
+            </div>
+        </details>
+
+        <details>
+            <summary>⚙️ Settings</summary>
+            <div class="expandable-content">
+                <div class="form-row">
+                    <div>
+                        <label>Course</label>
+                        <input type="number" id="orion_courseId">
+                    </div>
+
+                    <div>
+                        <label>Student</label>
+                        <input type="number" id="orion_studentId">
+                    </div>
+
+                    <div>
+                        <label>Assignment</label>
+                        <input type="number" id="orion_assignmentId">
+                    </div>
+                </div>
+
+                                <label>Your e-mail</label>
+                <input type="email" id="orion_email" placeholder="Enter your email">
+            </div>
+        </details>
+
+        <details open>
+            <summary>📝 Grading</summary>
+            <div class="expandable-content">
+                <label for="orion_score">Score</label>
+                <input type="number" id="orion_score" placeholder="Enter score" min="0">
+
+                <label for="orion_comment">Comment</label>
+                <input type="text" id="orion_comment" placeholder="Enter comment">
+            </div>
+        </details>
+
+        <button onclick="submitGrade()">Submit Grade</button>
+        <div id="orionResultContainer" class="result-container"></div>
+        <button id="orion_scanAgain" onclick="startScanner()">Scan Another</button>
+    </div>
+
+    <div id="ansForm" style="display: none;">
+        <details open>
+            <summary>📧 Basic Info</summary>
+            <div class="expandable-content">
+                <label>Student e-mail</label>
+                <input type="email" id="ans_studentEmail" readonly>
+
+                <label>Assignment ID</label>
+                <input type="number" id="ans_assignmentId" readonly>
+            </div>
+        </details>
+
+        <details>
+            <summary>⚙️ Settings</summary>
+            <div class="expandable-content">
+                <div class="form-row">
+                    <div>
+                        <label>Deadline</label>
+                        <input type="number" id="ans_deadline" readonly>
+                    </div>
+
+                    <div>
+                        <label>Duration</label>
+                        <input type="number" id="ans_duration" readonly>
+                    </div>
+
+                    <div>
+                        <label>IOEM</label>
+                        <input type="number" id="ans_ioem" readonly>
+                    </div>
+                </div>
+
+                <label for="ans_openDatetime">ANS Open DateTime</label>
+                <input type="datetime-local" id="ans_openDatetime" placeholder="Enter open datetime">
+
+                <label for="ans_deadlineDatetime">ANS Deadline DateTime</label>
+                <input type="datetime-local" id="ans_deadlineDatetime" placeholder="Enter deadline datetime">
+
+                <label for="ans_bearer">ANS Bearer Token</label>
+                <input type="text" id="ans_bearer" placeholder="Ans bearer token">
+            </div>
+        </details>
+
+        <button onclick="submitANSGrade()">Submit</button>
+        <div id="ansResultContainer" class="result-container"></div>
+        <button id="ans_scanAgain" onclick="startScanner()">Scan Another</button>
+    </div>
+
+    <details style="margin-top: 30px;">
+        <summary>🐞 Debug Log</summary>
+        <button onclick="document.getElementById('debugLog').innerHTML = '';" style="margin: 5px 0; padding: 5px; width: auto;">Clear Log</button>
+        <div id="debugLog">Ready...</div>
+    </details>
+
+    <script>
+
+        /// Do not change above this line ///
+
+        // ====================================================================
+        // CONFIGURATION - API URLs and Storage Keys
+        // ====================================================================
+
+        const ANS_BEARER_KEY = 'ans_bearer_token'; // Do not change. Used for localStorage key.
+        const GRADER_EMAIL_KEY = 'grader_email'; // Do not change. Used for localStorage key.
+        const GRADER_SECRET_KEY = 'grader_secret'; // Do not change. Used for localStorage key.
+        const GET_BEARER_URL_KEY = 'get_bearer_url'; // Do not change. Used for localStorage key.
+        const ANS_START_TEST_URL_KEY = 'ans_start_test_url'; // Do not change. Used for localStorage key.
+
+        // ====================================================================
+        // CONSTANTS
+        // ====================================================================
+        const FETCH_TIMEOUT_MS = 30000; // 30 seconds
+        const QR_SCANNER_FPS = 10;
+        const QR_SCANNER_BOX_SIZE = 200;
+        const MAX_DEBUG_ENTRIES = 100;
+
+        // ====================================================================
+        // GLOBAL STATE
+        // ====================================================================
+
+        let html5QrCode;
+        let cachedBearer = null;
+
+        // ====================================================================
+        // UTILITY FUNCTIONS
+        // ====================================================================
+
+        /**
+         * Wraps a fetch call with a timeout
+         * @param {string} url - The URL to fetch
+         * @param {Object} options - Fetch options
+         * @param {number} timeout - Timeout in milliseconds (default: FETCH_TIMEOUT_MS)
+         * @returns {Promise<Response>} The fetch response
+         * @throws {Error} If the request times out or fails
+         */
+        async function fetchWithTimeout(url, options = {}, timeout = FETCH_TIMEOUT_MS) {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+            try {
+                const response = await fetch(url, {
+                    ...options,
+                    signal: controller.signal
+                });
+                clearTimeout(timeoutId);
+                return response;
+            } catch (error) {
+                clearTimeout(timeoutId);
+                if (error.name === 'AbortError') {
+                    throw new Error('Request timeout - please check your connection and try again');
+                }
+                throw error;
+            }
+        }
+
+        /**
+         * Sanitizes HTML to prevent XSS attacks
+         * @param {string} html - The HTML string to sanitize
+         * @returns {string} The sanitized HTML string
+         */
+        function sanitizeHtml(html) {
+            if (!html) return '';
+            const div = document.createElement('div');
+            div.textContent = html;
+            return div.innerHTML;
+        }
+
+        /**
+         * Validates email format
+         * @param {string} email - The email address to validate
+         * @returns {boolean} True if valid email format
+         */
+        function isValidEmail(email) {
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            return emailRegex.test(email);
+        }
+
+        /**
+         * Checks whether a string is an http(s) URL
+         * @param {string} value - The value to check
+         * @returns {boolean} True if the value parses as an http(s) URL
+         */
+        function isValidUrl(value) {
+            try {
+                const parsed = new URL(value);
+                return parsed.protocol === 'https:' || parsed.protocol === 'http:';
+            } catch (e) {
+                return false;
+            }
+        }
+
+        /**
+         * Gets the Get Bearer flow URL. localStorage is the only source; there is no default
+         * @returns {string} The Get Bearer flow URL, or '' when it has not been configured
+         */
+        function getBearerEndpoint() {
+            return localStorage.getItem(GET_BEARER_URL_KEY) || '';
+        }
+
+        /**
+         * Gets the ANS Start Test flow URL. localStorage is the only source; there is no default
+         * @returns {string} The ANS Start Test flow URL, or '' when it has not been configured
+         */
+        function getAnsStartTestEndpoint() {
+            return localStorage.getItem(ANS_START_TEST_URL_KEY) || '';
+        }
+
+        /**
+         * Saves a value to localStorage, or clears the key when the value is empty
+         * @param {string} key - The localStorage key
+         * @param {string} value - The value to save; falsy clears the key
+         */
+        function saveOrClearStorage(key, value) {
+            if (value) {
+                localStorage.setItem(key, value);
+            } else {
+                localStorage.removeItem(key);
+            }
+        }
+
+        // ====================================================================
+        // UI FUNCTIONS
+        // ====================================================================
+
+        /**
+         * Logs a debug message to console and debug UI
+         * Limits entries to MAX_DEBUG_ENTRIES to prevent memory issues
+         * @param {string} message - The message to log
+         */
+        function logDebug(message) {
+            console.log(message);
+            const logDiv = document.getElementById('debugLog');
+            if (logDiv) {
+                // Remove oldest entries if we exceed the limit
+                while (logDiv.children.length >= MAX_DEBUG_ENTRIES) {
+                    logDiv.removeChild(logDiv.firstChild);
+                }
+
+                const entry = document.createElement('div');
+                entry.textContent = `${new Date().toLocaleTimeString()} - ${message}`;
+                entry.style.borderBottom = '1px solid #ccc';
+                logDiv.appendChild(entry);
+                logDiv.scrollTop = logDiv.scrollHeight;
+            }
+        }
+
+        function showError(message) {
+            const errorContainer = document.getElementById('errorContainer');
+            errorContainer.textContent = message;
+            errorContainer.style.display = 'block';
+            console.error(message);
+        }
+
+        function clearError() {
+            const errorContainer = document.getElementById('errorContainer');
+            errorContainer.style.display = 'none';
+        }
+
+        function showLoading(message) {
+            document.getElementById('loadingText').textContent = message;
+            document.getElementById('loadingMessage').classList.add('show');
+        }
+
+        function hideLoading() {
+            document.getElementById('loadingMessage').classList.remove('show');
+        }
+
+        function loadANSBearer() {
+            const savedBearer = localStorage.getItem(ANS_BEARER_KEY);
+            if (savedBearer) {
+                document.getElementById('ans_bearer').value = savedBearer;
+                console.log('ANS bearer token loaded from localStorage');
+            }
+        }
+
+        function saveANSBearer() {
+            const bearerValue = document.getElementById('ans_bearer').value;
+            if (bearerValue) {
+                localStorage.setItem(ANS_BEARER_KEY, bearerValue);
+                console.log('ANS bearer token saved to localStorage');
+            }
+        }
+
+        function loadGraderEmail() {
+            const savedEmail = localStorage.getItem(GRADER_EMAIL_KEY);
+            if (savedEmail) {
+                document.getElementById('orion_email').value = savedEmail;
+                console.log('Grader email loaded from localStorage');
+            }
+        }
+
+        function saveGraderEmail() {
+            const emailValue = document.getElementById('orion_email').value;
+            if (emailValue) {
+                localStorage.setItem(GRADER_EMAIL_KEY, emailValue);
+                console.log('Grader email saved to localStorage');
+            }
+        }
+
+        /**
+         * Formats a Date object for datetime-local input field
+         * @param {Date} date - The date to format
+         * @returns {string} Formatted datetime string (YYYY-MM-DDTHH:mm)
+         */
+        function formatDatetimeLocal(date) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            const hours = String(date.getHours()).padStart(2, '0');
+            const minutes = String(date.getMinutes()).padStart(2, '0');
+            return `${year}-${month}-${day}T${hours}:${minutes}`;
+        }
+
+        function showResult(message, isSuccess = true, formType = 'orion') {
+            const containerId = formType === 'ans' ? 'ansResultContainer' : 'orionResultContainer';
+            const container = document.getElementById(containerId);
+            container.textContent = message;
+            container.className = `result-container show ${isSuccess ? 'success' : 'error'}`;
+        }
+
+        function hideResult(formType = 'orion') {
+            const containerId = formType === 'ans' ? 'ansResultContainer' : 'orionResultContainer';
+            const container = document.getElementById(containerId);
+            container.classList.remove('show');
+        }
+
+        // ====================================================================
+        // AUTHENTICATION FUNCTIONS
+        // ====================================================================
+
+        /**
+         * Validates the email input and starts the authentication process
+         */
+        async function validateEmailAndStart() {
+            const email = document.getElementById('setupEmail').value.trim();
+            const secret = document.getElementById('setupSecret').value.trim();
+            const getBearerUrlInput = document.getElementById('setupGetBearerUrl').value.trim();
+            const ansStartTestUrlInput = document.getElementById('setupAnsStartTestUrl').value.trim();
+
+            if (!email) {
+                showError('Please enter your email address');
+                return;
+            }
+
+            if (!isValidEmail(email)) {
+                showError('Please enter a valid email address');
+                return;
+            }
+
+            if (!secret) {
+                showError('Please enter your secret');
+                return;
+            }
+
+            if (!isValidUrl(getBearerUrlInput)) {
+                document.getElementById('endpointsSection').open = true;
+                showError('Please enter the Get Bearer flow URL under Endpoints');
+                return;
+            }
+
+            if (ansStartTestUrlInput && !isValidUrl(ansStartTestUrlInput)) {
+                document.getElementById('endpointsSection').open = true;
+                showError('The ANS Start Test URL is not a valid URL');
+                return;
+            }
+
+            saveOrClearStorage(GET_BEARER_URL_KEY, getBearerUrlInput);
+            saveOrClearStorage(ANS_START_TEST_URL_KEY, ansStartTestUrlInput);
+
+            await authenticateUser(email, secret);
+        }
+
+        async function authenticateUser(email, secret) {
+            // Save email and secret for future use
+            localStorage.setItem(GRADER_EMAIL_KEY, email);
+            localStorage.setItem(GRADER_SECRET_KEY, secret);
+
+            showLoading('Validating email and getting authorization...');
+            clearError();
+
+            try {
+                const bearer = await getBearer(email, secret);
+                if (!bearer) {
+                    hideLoading();
+                    return false;
+                }
+                
+                // Verify bearer works with whoami call
+                const whoamiData = await getWhoami(bearer);
+                if (!whoamiData) {
+                    hideLoading();
+                    return false;
+                }
+                
+                cachedBearer = bearer;
+                document.getElementById('orion_email').value = email;
+                document.getElementById('currentUser').textContent = email;
+                
+                hideLoading();
+                console.log('User authenticated:', whoamiData.UniqueName);
+                
+                // Hide email setup and show scanner
+                document.getElementById('emailSetup').style.display = 'none';
+                document.getElementById('scannerSection').style.display = 'block';
+                
+                startScanner();
+                return true;
+            } catch (error) {
+                hideLoading();
+                showError('Authentication failed: ' + error.message);
+                return false;
+            }
+        }
+        
+        function changeUser() {
+            cleanup();
+            cachedBearer = null;
+            document.getElementById('emailSetup').style.display = 'block';
+            document.getElementById('scannerSection').style.display = 'none';
+            document.getElementById('orionForm').style.display = 'none';
+            document.getElementById('ansForm').style.display = 'none';
+            document.getElementById('reader').style.display = 'none';
+            hideResult('orion');
+            hideResult('ans');
+            clearError();
+            document.getElementById('setupEmail').focus();
+        }
+
+        // ====================================================================
+        // QR SCANNER FUNCTIONS
+        // ====================================================================
+
+        /**
+         * Starts the QR code scanner
+         * Initializes camera and begins scanning for QR codes
+         */
+        function startScanner() {
+            document.getElementById('orionForm').style.display = 'none';
+            document.getElementById('ansForm').style.display = 'none';
+            document.getElementById('reader').style.display = 'block';
+            hideResult('orion');
+            hideResult('ans');
+            document.getElementById('orion_score').value = '';
+            clearError();
+
+            html5QrCode = new Html5Qrcode("reader");
+            html5QrCode.start({
+                    facingMode: "environment"
+                }, {
+                    fps: QR_SCANNER_FPS,
+                    qrbox: { width: QR_SCANNER_BOX_SIZE, height: QR_SCANNER_BOX_SIZE }
+                },
+                onScanSuccess,
+                onScanFailure
+            );
+        }
+
+        function cleanup() {
+            if (html5QrCode && html5QrCode.isScanning) {
+                html5QrCode.stop().then(() => {
+                    html5QrCode.clear();
+                });
+            }
+        }
+
+        async function onScanSuccess(decodedText) {
+            html5QrCode.stop();
+            document.getElementById('reader').style.display = 'none';
+            document.getElementById('debugLog').innerHTML = '';
+
+            try {
+                const data = JSON.parse(decodedText);
+                logDebug('QR Scanned: ' + JSON.stringify(data));
+
+                                                                // Use the already validated email and bearer
+                const graderEmail = document.getElementById('orion_email').value;
+
+                // Check if this is ANS format or Orion format
+                if (data.ans) {
+                    // ANS format
+                    document.getElementById('ans_studentEmail').value = data.studentEmail;
+                    document.getElementById('ans_assignmentId').value = data.ans.assignment_id;
+                    document.getElementById('ans_deadline').value = data.ans.deadline;
+                    document.getElementById('ans_duration').value = data.ans.duration;
+                    document.getElementById('ans_ioem').value = data.ans.ioem;
+
+                    // Calculate and set datetime fields
+                    const nowDate = new Date();
+                    const deadlineDate = new Date(nowDate.getTime() + data.ans.deadline * 60 * 1000);
+
+                    document.getElementById('ans_openDatetime').value = formatDatetimeLocal(nowDate);
+                    document.getElementById('ans_deadlineDatetime').value = formatDatetimeLocal(deadlineDate);
+
+                    // Load saved bearer token
+                    loadANSBearer();
+
+                    document.getElementById('ansForm').style.display = 'block';
+                    document.getElementById('ans_openDatetime').focus();
+                                                } else if (data.orion) {
+                    // Orion format - use cached bearer (already validated)
+                    const bearer = cachedBearer;
+                    if (!bearer) {
+                        showError('Authorization token not available. Please refresh and try again.');
+                        return;
+                    }
+
+                        const courseId = data.orion.orgUnitId;
+                        const assignmentShortname = data.orion.assignmentShortname || '';
+
+                            // Get assignment ID from name
+                            showLoading('Getting assignment information...');
+                            logDebug(`Starting lookup for Course: ${courseId}, ID: ${data.orion.gradeId}, ShortName: ${assignmentShortname}`);
+                            const gradeObject = await getGradeObject(bearer, data.orion);
+                            hideLoading();
+                            
+                            if (gradeObject) {
+                                document.getElementById('orion_courseId').value = courseId;
+                                document.getElementById('orion_studentId').value = data.orion.studentId || data.orion.userid;
+                                document.getElementById('orion_studentEmail').value = data.studentEmail || data.email;
+                                
+                                let displayName = gradeObject.Name;
+                                if (gradeObject.CategoryName) {
+                                    displayName = `${gradeObject.CategoryName} - ${gradeObject.Name}`;
+                                }
+                                document.getElementById('orion_assignmentShortname').value = displayName;
+                                document.getElementById('orion_assignmentId').value = gradeObject.Id;
+
+                                if (gradeObject.MaxPoints !== undefined) {
+                                    const maxPoints = gradeObject.MaxPoints;
+                                    logDebug('Max points found: ' + maxPoints);
+                                    document.getElementById('orion_score').min = 0;
+                                    document.getElementById('orion_score').value = maxPoints;
+                                    
+                                    if (gradeObject.CanExceedMax === false) {
+                                        document.getElementById('orion_score').max = maxPoints;
+                                    }
+                                }
+                            } else {
+                                logDebug('Final result: Grade object is null');
+                                showError(`Assignment not found. ShortName: ${assignmentShortname}, ID: ${data.orion.gradeId || 'N/A'}`);
+                            }
+
+                                                                        document.getElementById('orionForm').style.display = 'block';
+                    document.getElementById('orion_score').focus();
+                }
+            } catch (e) {
+                hideLoading();
+                showError('Invalid QR code format. Please try again.');
+                logDebug('QR parse error: ' + e.message);
+                startScanner();
+            }
+        }
+
+        function onScanFailure(error) {
+            //showError('Scan error: ' + error);
+        }
+
+        // ====================================================================
+        // API FUNCTIONS
+        // ====================================================================
+
+        /**
+         * Retrieves a bearer token from the authentication service
+         * @param {string} email - The user's email address
+         * @param {string} secret - The user's grader secret
+         * @returns {Promise<string|null>} The bearer token or null on error
+         */
+        async function getBearer(email, secret) {
+            const bearerEndpoint = getBearerEndpoint();
+            if (!bearerEndpoint) {
+                showError('No Get Bearer URL configured. Set it under Endpoints on the setup screen.');
+                return null;
+            }
+
+            try {
+                const response = await fetchWithTimeout(bearerEndpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        email: email,
+                        secret: secret
+                    })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    return data.Bearer;
+                } else {
+                    showError('Error getting bearer token: ' + response.statusText);
+                    return null;
+                }
+            } catch (err) {
+                showError('Error getting bearer token: ' + err.message);
+                return null;
+            }
+        }
+
+        /**
+         * Gets the current user's information from Orion API
+         * @param {string} bearer - The bearer authentication token
+         * @returns {Promise<Object|null>} User data object or null on error
+         */
+        async function getWhoami(bearer) {
+            try {
+                if (!bearer) {
+                    throw new Error('Bearer token is required for call');
+                }
+
+                const response = await fetchWithTimeout('https://orion.hogent.be/d2l/api/lp/1.43/users/whoami', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${bearer}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    return data;
+                } else {
+                    showError('Error getting user info: ' + response.statusText);
+                    return null;
+                }
+            } catch (err) {
+                showError('Error getting user info: ' + err.message);
+                return null;
+            }
+        }
+
+        /**
+         * Retrieves grade/assignment object from Orion API
+         * Tries multiple lookup strategies: by ID first, then by ShortName
+         * Also fetches category information if available
+         * @param {string} bearer - The bearer authentication token
+         * @param {Object} orionData - Object containing orgUnitId, gradeId, assignmentShortname
+         * @returns {Promise<Object|null>} Grade object with assignment details or null if not found
+         */
+        async function getGradeObject(bearer, orionData) {
+            try {
+                if (!bearer) {
+                    throw new Error('Bearer token is required for call');
+                }
+
+                const noreplace_courseId = orionData.orgUnitId;
+                const targetShortname = orionData.assignmentShortname;
+                const targetId = orionData.gradeId;
+
+                let grade = null;
+
+                // 1. Try to fetch by ID first if available
+                if (targetId) {
+                    const url = `https://orion.hogent.be/d2l/api/le/1.86/${noreplace_courseId}/grades/${targetId}`;
+                    logDebug(`Fetching direct ID: ${url}`);
+                    const response = await fetchWithTimeout(url, {
+                        method: 'GET',
+                        headers: {
+                            'Authorization': `Bearer ${bearer}`,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+
+                    logDebug(`Direct fetch status: ${response.status} ${response.statusText}`);
+                    if (response.ok) {
+                        grade = await response.json();
+                        logDebug(`Found grade via direct fetch: ${grade.Name} (ID: ${grade.Id})`);
+                    }
+                }
+
+                // 2. If not found (or no ID), try to find by ShortName
+                if (!grade && targetShortname) {
+                    logDebug(`Searching by ShortName: ${targetShortname}`);
+                    const response = await fetchWithTimeout(`https://orion.hogent.be/d2l/api/le/1.86/${noreplace_courseId}/grades/`, {
+                        method: 'GET',
+                        headers: {
+                            'Authorization': `Bearer ${bearer}`,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+
+                    if (response.ok) {
+                        const allGrades = await response.json();
+                        if (Array.isArray(allGrades)) {
+                            grade = allGrades.find(g => g.ShortName === targetShortname);
+                            if (grade) {
+                                logDebug(`Found grade via ShortName search: ${grade.Name}`);
+                            }
+                        }
+                    }
+                }
+
+                // 3. If grade found, check for category
+                if (grade) {
+                    grade.CategoryName = null; // Initialize property to ensure it appears in logs
+                    if (grade.CategoryId && grade.CategoryId > 0) {
+                        const catUrl = `https://orion.hogent.be/d2l/api/le/1.86/${noreplace_courseId}/grades/categories/${grade.CategoryId}`;
+                        logDebug(`Fetching category info for CategoryId: ${grade.CategoryId}`);
+                        try {
+                            const catResponse = await fetchWithTimeout(catUrl, {
+                                method: 'GET',
+                                headers: {
+                                    'Authorization': `Bearer ${bearer}`,
+                                    'Content-Type': 'application/json'
+                                }
+                            });
+
+                            if (catResponse.ok) {
+                                const category = await catResponse.json();
+                                logDebug('Category fetch result: ' + JSON.stringify(category, null, 4));
+                                grade.CategoryName = category.Name;
+                                logDebug(`Added category name: ${category.Name}`);
+                            } else {
+                                logDebug(`Category fetch failed: ${catResponse.status} URL: ${catUrl}`);
+                            }
+                        } catch (e) {
+                            logDebug('Could not fetch category details: ' + e.message);
+                        }
+                    } else {
+                        logDebug('No CategoryId found on grade object.');
+                    }
+                    logDebug('Final Grade Object: ' + JSON.stringify(grade, null, 4));
+                    return grade;
+                }
+
+                logDebug('Assignment not found after all attempts.');
+                return null;
+            } catch (err) {
+                logDebug('Error in getGradeObject: ' + err.message);
+                showError('Error getting assignment: ' + err.message);
+                return null;
+            }
+        }
+
+
+        // ====================================================================
+        // GRADE SUBMISSION FUNCTIONS
+        // ====================================================================
+
+        /**
+         * Submits a grade to the Orion/Brightspace API
+         * @param {string} bearer - The bearer authentication token
+         * @param {number} noreplace_courseId - The course ID
+         * @param {number} noreplace_assignmentId - The assignment/grade object ID
+         * @param {number} noreplace_userId - The student user ID
+         * @param {number} score - The numeric score to assign
+         * @param {string} comment - Optional comment (will be sanitized)
+         * @returns {Promise<Object>} Object with success boolean and data/error
+         */
+        async function submitGradeToOrion(bearer, noreplace_courseId, noreplace_assignmentId, noreplace_userId, score, comment) {
+            try {
+                // Sanitize the comment to prevent XSS
+                const sanitizedComment = sanitizeHtml(comment || "");
+
+                const gradeData = {
+                    "GradeObjectType": 1,
+                    "PointsNumerator": score,
+                    "Comments": {
+                        "Content": sanitizedComment,
+                        "Type": "Html"
+                    },
+                    "PrivateComments": {
+                        "Content": "",
+                        "Type": "Html"
+                    }
+                };
+
+                const url = `https://orion.hogent.be/d2l/api/le/1.86/${noreplace_courseId}/grades/${noreplace_assignmentId}/values/${noreplace_userId}`;
+
+                logDebug(`Submitting grade to: ${url}`);
+                logDebug(`Data: Score=${score}, Comment=${comment ? 'Yes' : 'No'}`);
+
+                const response = await fetchWithTimeout(url, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${bearer}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(gradeData)
+                });
+
+                if (response.ok) {
+                    const text = await response.text();
+                    const data = text ? JSON.parse(text) : {};
+                    logDebug('Grade submitted successfully');
+                    return {
+                        success: true,
+                        data: data
+                    };
+                } else {
+                    const error = await response.text();
+                    logDebug(`Error submitting grade: ${response.status} ${response.statusText}`);
+                    logDebug(`Server response: ${error}`);
+                    return {
+                        success: false,
+                        error: `${response.status} ${response.statusText}`
+                    };
+                }
+            } catch (err) {
+                logDebug(`Exception in submitGradeToOrion: ${err.message}`);
+                return {
+                    success: false,
+                    error: err.message
+                };
+            }
+        }
+
+        /**
+         * Submits the grade form for Orion
+         * Validates all inputs before submission
+         */
+        async function submitGrade() {
+            const courseId = parseInt(document.getElementById('orion_courseId').value);
+            const userId = parseInt(document.getElementById('orion_studentId').value);
+            const assignmentId = parseInt(document.getElementById('orion_assignmentId').value);
+            const score = parseInt(document.getElementById('orion_score').value);
+            const comment = document.getElementById('orion_comment').value;
+
+            logDebug(`Submit initiated. Course: ${courseId}, User: ${userId}, Assignment: ${assignmentId}, Score: ${score}`);
+
+            // Validate score input
+            if (isNaN(score)) {
+                showResult('Please enter a score', false);
+                return;
+            }
+
+            if (score < 0) {
+                showResult('Score cannot be negative', false);
+                return;
+            }
+
+            // Check if score exceeds maximum when not allowed
+            const scoreInput = document.getElementById('orion_score');
+            if (scoreInput.max && score > parseInt(scoreInput.max)) {
+                showResult(`Score cannot exceed maximum of ${scoreInput.max}`, false);
+                return;
+            }
+
+            if (isNaN(courseId) || isNaN(userId) || isNaN(assignmentId)) {
+                showResult('Error: Missing or invalid course, student, or assignment ID', false);
+                logDebug('Validation failed: One or more IDs are NaN');
+                return;
+            }
+
+            hideResult();
+            showLoading('Submitting grade...');
+
+            try {
+                const bearer = cachedBearer;
+
+                if (!bearer) {
+                    hideLoading();
+                    showResult('Error: Authorization token not available', false);
+                    return;
+                }
+
+                const result = await submitGradeToOrion(bearer, courseId, assignmentId, userId, score, comment);
+
+                hideLoading();
+                if (result.success) {
+                    showResult('Grade submitted!');
+                } else {
+                    showResult('Error: ' + result.error, false);
+                }
+            } catch (err) {
+                hideLoading();
+                showResult('Error: ' + err.message, false);
+            }
+        }
+
+        /**
+         * Submits an ANS (exam) test configuration
+         * Validates inputs and sends request to Power Automate workflow
+         */
+        async function submitANSGrade() {
+            const email = document.getElementById('ans_studentEmail').value;
+            const assignmentId = parseInt(document.getElementById('ans_assignmentId').value);
+            const openDatetime = document.getElementById('ans_openDatetime').value;
+            const deadlineDatetime = document.getElementById('ans_deadlineDatetime').value;
+            const duration = parseInt(document.getElementById('ans_duration').value);
+            const bearer = document.getElementById('ans_bearer').value;
+
+            // Save bearer to localStorage
+            saveANSBearer();
+
+            if (!email || !openDatetime || !deadlineDatetime || !bearer) {
+                showResult('Please fill in all required fields', false, 'ans');
+                return;
+            }
+
+            if (!isValidEmail(email)) {
+                showResult('Please enter a valid email address', false, 'ans');
+                return;
+            }
+
+            const ansEndpoint = getAnsStartTestEndpoint();
+            if (!ansEndpoint) {
+                showResult('No ANS Start Test URL configured. Set it under Endpoints on the setup screen.', false, 'ans');
+                return;
+            }
+
+            hideResult('ans');
+            showLoading('Submitting ANS request...');
+
+            try {
+                const response = await fetchWithTimeout(ansEndpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        bearer: bearer,
+                        email: email,
+                        assignment_id: assignmentId,
+                        open_datetime: openDatetime,
+                        deadline_datetime: deadlineDatetime,
+                        duration: duration
+                    })
+                });
+
+                if (response.ok) {
+                    hideLoading();
+                    showResult('ANS flow triggered successfully!', true, 'ans');
+                } else {
+                    const error = await response.text();
+                    hideLoading();
+                    showResult('Error: ' + error, false, 'ans');
+                }
+            } catch (err) {
+                hideLoading();
+                showResult('Error: ' + err.message, false, 'ans');
+            }
+        }
+
+        /**
+         * Attempts to automatically authenticate user based on existing session
+         * Falls back to manual email entry if auto-login fails
+         * @returns {Promise<boolean>} True if auto-login succeeded
+         */
+        async function tryAutoLogin() {
+            // Hide setup initially
+            document.getElementById('emailSetup').style.display = 'none';
+            showLoading('Checking user session...');
+
+            try {
+                const response = await fetchWithTimeout('/d2l/api/lp/1.43/users/whoami');
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.UniqueName) {
+                        const savedSecret = localStorage.getItem(GRADER_SECRET_KEY);
+                        if (savedSecret) {
+                            console.log('Auto-detected user:', data.UniqueName);
+                            return await authenticateUser(data.UniqueName, savedSecret);
+                        }
+                        document.getElementById('setupEmail').value = data.UniqueName;
+                    }
+                }
+            } catch (e) {
+                console.log('Auto-login check failed:', e);
+            }
+
+            // If we get here, auto-login failed
+            hideLoading();
+            document.getElementById('emailSetup').style.display = 'block';
+            return false;
+        }
+
+        // ====================================================================
+        // INITIALIZATION
+        // ====================================================================
+
+        // Load saved email on page load
+        window.onload = async function() {
+            document.getElementById('setupGetBearerUrl').value = getBearerEndpoint();
+            document.getElementById('setupAnsStartTestUrl').value = getAnsStartTestEndpoint();
+            if (!getBearerEndpoint()) {
+                document.getElementById('endpointsSection').open = true;
+            }
+
+            const autoSuccess = await tryAutoLogin();
+            
+            if (!autoSuccess) {
+                const savedEmail = localStorage.getItem(GRADER_EMAIL_KEY);
+                if (savedEmail && !document.getElementById('setupEmail').value) {
+                    document.getElementById('setupEmail').value = savedEmail;
+                }
+                const savedSecret = localStorage.getItem(GRADER_SECRET_KEY);
+                if (savedSecret) {
+                    document.getElementById('setupSecret').value = savedSecret;
+                }
+                document.getElementById('setupEmail').focus();
+            }
+        }
+    </script>
+</body>
+
+</html>
