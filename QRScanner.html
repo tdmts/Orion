@@ -372,6 +372,8 @@
         // CONFIGURATION - API URLs and Storage Keys
         // ====================================================================
 
+        const APP_VERSION = '1.0.0'; // Bump when releasing a new build of this page.
+
         const ANS_BEARER_KEY = 'ans_bearer_token'; // Do not change. Used for localStorage key.
         const GRADER_EMAIL_KEY = 'grader_email'; // Do not change. Used for localStorage key.
         const GRADER_SECRET_KEY = 'grader_secret'; // Do not change. Used for localStorage key.
@@ -1275,6 +1277,7 @@
 
         // Load saved email on page load
         window.onload = async function() {
+            document.getElementById('appVersion').textContent = 'v' + APP_VERSION;
             document.getElementById('setupGetBearerUrl').value = getBearerEndpoint();
             document.getElementById('setupAnsStartTestUrl').value = getAnsStartTestEndpoint();
             if (!getBearerEndpoint()) {
@@ -1296,6 +1299,7 @@
             }
         }
     </script>
+    <div id="appVersion" style="margin-top: 20px; font-size: 11px; color: #888; text-align: center;"></div>
 </body>
 
 </html>
