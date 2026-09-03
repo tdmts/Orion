@@ -379,7 +379,7 @@
         // CONFIGURATION - API URLs and Storage Keys
         // ====================================================================
 
-        const APP_VERSION = '2026-09-03 16:11'; // Build timestamp. Set to the current date and time when releasing.
+        const APP_VERSION = '2026-09-03 16:23'; // Build timestamp. Set to the current date and time when releasing.
 
         const ANS_BEARER_KEY = 'ans_bearer_token'; // Do not change. Used for localStorage key.
         const GRADER_EMAIL_KEY = 'grader_email'; // Do not change. Used for localStorage key.
@@ -1017,8 +1017,16 @@
                     throw new Error('Bearer token is required for call');
                 }
 
-                logDebug('GET https://orion.hogent.be/d2l/api/lp/1.43/users/whoami');
-                const response = await fetchWithTimeout('https://orion.hogent.be/d2l/api/lp/1.43/users/whoami', {
+                const whoamiUrl = 'https://orion.hogent.be/d2l/api/lp/1.43/users/whoami';
+                logDebug('--- Whoami request (reproduce in Postman) ---');
+                logDebug('Method: GET');
+                logDebug('URL: ' + whoamiUrl);
+                logDebug('Header: Authorization: Bearer ' + bearer);
+                logDebug('Header: Content-Type: application/json');
+                logDebug(`curl -X GET '${whoamiUrl}' -H 'Authorization: Bearer ${bearer}' -H 'Content-Type: application/json'`);
+                logDebug('--- end Whoami request ---');
+
+                const response = await fetchWithTimeout(whoamiUrl, {
                     method: 'GET',
                     headers: {
                         'Authorization': `Bearer ${bearer}`,
