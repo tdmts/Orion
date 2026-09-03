@@ -224,39 +224,46 @@
     <div id="reader"></div>
 
         <div id="emailSetup" style="display: block;">
-        <p>Enter your email address to begin:</p>
-        <label for="setupEmail">Your Email</label>
-        <input type="email" id="setupEmail" placeholder="Enter your email address">
-        <label for="setupSecret">Your Secret</label>
-        <input type="password" id="setupSecret" placeholder="Enter your secret">
-
-        <details id="endpointsSection" style="margin-top: 10px;">
-            <summary>⚙️ Endpoints (advanced)</summary>
-            <div class="expandable-content">
-                <label for="setupGetBearerUrl">Get Bearer URL</label>
-                <input type="text" id="setupGetBearerUrl" placeholder="Get Bearer flow URL">
-
-                <label for="setupAnsStartTestUrl">ANS Start Test URL</label>
-                <input type="text" id="setupAnsStartTestUrl" placeholder="ANS Start Test flow URL">
-            </div>
-        </details>
-
+        <p>Configure your email, secret and endpoints under ⚙️ Settings below, then tap Start Scanning.</p>
         <button onclick="validateEmailAndStart()">Start Scanning</button>
     </div>
-    
+
+    <details id="settingsSection" style="margin-bottom: 15px;" ontoggle="if (this.open) loadSettingsFields()">
+        <summary>⚙️ Settings</summary>
+        <div class="expandable-content">
+            <label for="settings_email">Your Email</label>
+            <input type="email" id="settings_email" placeholder="Enter your email address">
+
+            <label for="settings_secret">Your Secret</label>
+            <input type="password" id="settings_secret" placeholder="Enter your secret">
+
+            <label for="settings_getBearerUrl">Get Bearer URL</label>
+            <input type="text" id="settings_getBearerUrl" placeholder="Get Bearer flow URL">
+
+            <label for="settings_ansStartTestUrl">ANS Start Test URL</label>
+            <input type="text" id="settings_ansStartTestUrl" placeholder="ANS Start Test flow URL">
+
+            <label for="settings_ansBearer">ANS Bearer Token</label>
+            <input type="text" id="settings_ansBearer" placeholder="Ans bearer token">
+
+            <button onclick="saveSettingsSection()">Save Settings</button>
+            <div id="settingsResultContainer" class="result-container"></div>
+        </div>
+    </details>
+
     <div id="errorContainer" style="display: none; margin-bottom: 20px; padding: 15px; background-color: #f8d7da; color: #721c24; border-radius: 4px; border: 1px solid #f5c6cb;"></div>
     <div id="loadingMessage" class="loading-message">
         <div class="loading"></div>
         <span id="loadingText">Loading...</span>
     </div>
-    
+
     <div id="scannerSection" style="display: none;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
             <span>Scanning as: <strong id="currentUser"></strong></span>
             <button onclick="changeUser()" style="padding: 5px 10px; font-size: 12px; width: auto;">Change User</button>
         </div>
     </div>
-    
+
     <div id="orionForm" style="display: none;">
         <details open>
             <summary>📧 Basic Info</summary>
@@ -576,6 +583,87 @@
             }
         }
 
+        /**
+         * Populates the Settings section fields from localStorage
+         */
+        function loadSettingsFields() {
+            document.getElementById('settings_email').value = localStorage.getItem(GRADER_EMAIL_KEY) || '';
+            document.getElementById('settings_secret').value = localStorage.getItem(GRADER_SECRET_KEY) || '';
+            document.getElementById('settings_getBearerUrl').value = getBearerEndpoint();
+            document.getElementById('settings_ansStartTestUrl').value = getAnsStartTestEndpoint();
+            document.getElementById('settings_ansBearer').value = localStorage.getItem(ANS_BEARER_KEY) || '';
+        }
+
+        /**
+         * Reads the Settings section fields and validates their format (not their presence).
+         * On invalid input, reports the error and returns null.
+         * @param {string} formType - Where to report a validation error: 'settings' (inline in the
+         *   Settings section) or anything else (the top-level error banner, opening Settings first)
+         * @returns {{email: string, secret: string, getBearerUrl: string, ansStartTestUrl: string, ansBearer: string}|null}
+         */
+        function readAndValidateSettingsFields(formType) {
+            const email = document.getElementById('settings_email').value.trim();
+            const secret = document.getElementById('settings_secret').value.trim();
+            const getBearerUrl = document.getElementById('settings_getBearerUrl').value.trim();
+            const ansStartTestUrl = document.getElementById('settings_ansStartTestUrl').value.trim();
+            const ansBearer = document.getElementById('settings_ansBearer').value.trim();
+
+            const reportError = (message) => {
+                if (formType === 'settings') {
+                    showResult(message, false, 'settings');
+                } else {
+                    document.getElementById('settingsSection').open = true;
+                    showError(message);
+                }
+            };
+
+            if (email && !isValidEmail(email)) {
+                reportError('Please enter a valid email address');
+                return null;
+            }
+
+            if (getBearerUrl && !isValidUrl(getBearerUrl)) {
+                reportError('Get Bearer URL is not a valid URL');
+                return null;
+            }
+
+            if (ansStartTestUrl && !isValidUrl(ansStartTestUrl)) {
+                reportError('ANS Start Test URL is not a valid URL');
+                return null;
+            }
+
+            return { email, secret, getBearerUrl, ansStartTestUrl, ansBearer };
+        }
+
+        /**
+         * Saves validated Settings fields to localStorage, and syncs the fields
+         * elsewhere on the page that mirror the same values
+         * @param {{email: string, secret: string, getBearerUrl: string, ansStartTestUrl: string, ansBearer: string}} fields
+         */
+        function persistSettingsFields(fields) {
+            saveOrClearStorage(GRADER_EMAIL_KEY, fields.email);
+            saveOrClearStorage(GRADER_SECRET_KEY, fields.secret);
+            saveOrClearStorage(GET_BEARER_URL_KEY, fields.getBearerUrl);
+            saveOrClearStorage(ANS_START_TEST_URL_KEY, fields.ansStartTestUrl);
+            saveOrClearStorage(ANS_BEARER_KEY, fields.ansBearer);
+
+            document.getElementById('orion_email').value = fields.email;
+            document.getElementById('ans_bearer').value = fields.ansBearer;
+            document.getElementById('currentUser').textContent = fields.email;
+        }
+
+        /**
+         * Validates and saves the Settings section fields to localStorage
+         */
+        function saveSettingsSection() {
+            const fields = readAndValidateSettingsFields('settings');
+            if (!fields) return;
+
+            persistSettingsFields(fields);
+            logDebug('Local settings updated via Settings section');
+            showResult('Settings saved. Use Change User if you updated the email or secret.', true, 'settings');
+        }
+
         function loadGraderEmail() {
             const savedEmail = localStorage.getItem(GRADER_EMAIL_KEY);
             if (savedEmail) {
@@ -606,16 +694,20 @@
             return `${year}-${month}-${day}T${hours}:${minutes}`;
         }
 
+        function getResultContainerId(formType) {
+            if (formType === 'ans') return 'ansResultContainer';
+            if (formType === 'settings') return 'settingsResultContainer';
+            return 'orionResultContainer';
+        }
+
         function showResult(message, isSuccess = true, formType = 'orion') {
-            const containerId = formType === 'ans' ? 'ansResultContainer' : 'orionResultContainer';
-            const container = document.getElementById(containerId);
+            const container = document.getElementById(getResultContainerId(formType));
             container.textContent = message;
             container.className = `result-container show ${isSuccess ? 'success' : 'error'}`;
         }
 
         function hideResult(formType = 'orion') {
-            const containerId = formType === 'ans' ? 'ansResultContainer' : 'orionResultContainer';
-            const container = document.getElementById(containerId);
+            const container = document.getElementById(getResultContainerId(formType));
             container.classList.remove('show');
         }
 
@@ -627,42 +719,41 @@
          * Validates the email input and starts the authentication process
          */
         async function validateEmailAndStart() {
-            const email = document.getElementById('setupEmail').value.trim();
-            const secret = document.getElementById('setupSecret').value.trim();
-            const getBearerUrlInput = document.getElementById('setupGetBearerUrl').value.trim();
-            const ansStartTestUrlInput = document.getElementById('setupAnsStartTestUrl').value.trim();
+            logDebug('Start Scanning clicked');
 
-            if (!email) {
-                showError('Please enter your email address');
+            const fields = readAndValidateSettingsFields('setup');
+            if (!fields) {
+                logDebug('Settings validation failed (invalid email/URL format)');
                 return;
             }
 
-            if (!isValidEmail(email)) {
-                showError('Please enter a valid email address');
+            if (!fields.email) {
+                document.getElementById('settingsSection').open = true;
+                showError('Please enter your email address under Settings');
+                logDebug('Settings validation failed: email is missing');
                 return;
             }
 
-            if (!secret) {
-                showError('Please enter your secret');
+            if (!fields.secret) {
+                document.getElementById('settingsSection').open = true;
+                showError('Please enter your secret under Settings');
+                logDebug('Settings validation failed: secret is missing');
                 return;
             }
 
-            if (!isValidUrl(getBearerUrlInput)) {
-                document.getElementById('endpointsSection').open = true;
-                showError('Please enter the Get Bearer flow URL under Endpoints');
+            if (!isValidUrl(fields.getBearerUrl)) {
+                document.getElementById('settingsSection').open = true;
+                showError('Please enter the Get Bearer URL under Settings');
+                logDebug('Settings validation failed: Get Bearer URL is missing/invalid');
                 return;
             }
 
-            if (ansStartTestUrlInput && !isValidUrl(ansStartTestUrlInput)) {
-                document.getElementById('endpointsSection').open = true;
-                showError('The ANS Start Test URL is not a valid URL');
-                return;
-            }
+            logDebug('Settings validated');
 
-            saveOrClearStorage(GET_BEARER_URL_KEY, getBearerUrlInput);
-            saveOrClearStorage(ANS_START_TEST_URL_KEY, ansStartTestUrlInput);
+            persistSettingsFields(fields);
+            logDebug('Settings saved to localStorage');
 
-            await authenticateUser(email, secret);
+            await authenticateUser(fields.email, fields.secret);
         }
 
         async function authenticateUser(email, secret) {
@@ -674,35 +765,45 @@
             clearError();
 
             try {
+                logDebug(`Requesting bearer token for ${email}...`);
                 const bearer = await getBearer(email, secret);
                 if (!bearer) {
+                    logDebug('No bearer token received - aborting');
                     hideLoading();
                     return false;
                 }
-                
+                logDebug('Bearer token received');
+
                 // Verify bearer works with whoami call
+                logDebug('Verifying bearer token via whoami...');
                 const whoamiData = await getWhoami(bearer);
                 if (!whoamiData) {
+                    logDebug('Whoami verification failed - aborting');
                     hideLoading();
                     return false;
                 }
-                
+                logDebug('Whoami verified: ' + whoamiData.UniqueName);
+
                 cachedBearer = bearer;
                 document.getElementById('orion_email').value = email;
                 document.getElementById('currentUser').textContent = email;
-                
+
                 hideLoading();
                 console.log('User authenticated:', whoamiData.UniqueName);
-                
+                logDebug('Authentication successful');
+
                 // Hide email setup and show scanner
                 document.getElementById('emailSetup').style.display = 'none';
                 document.getElementById('scannerSection').style.display = 'block';
-                
+                loadSettingsFields();
+                logDebug('Scanner section shown');
+
                 startScanner();
                 return true;
             } catch (error) {
                 hideLoading();
                 showError('Authentication failed: ' + error.message);
+                logDebug('Authentication error: ' + error.message);
                 return false;
             }
         }
@@ -718,7 +819,8 @@
             hideResult('orion');
             hideResult('ans');
             clearError();
-            document.getElementById('setupEmail').focus();
+            document.getElementById('settingsSection').open = true;
+            document.getElementById('settings_email').focus();
         }
 
         // ====================================================================
@@ -730,6 +832,7 @@
          * Initializes camera and begins scanning for QR codes
          */
         function startScanner() {
+            logDebug('Initializing QR camera scanner...');
             document.getElementById('orionForm').style.display = 'none';
             document.getElementById('ansForm').style.display = 'none';
             document.getElementById('reader').style.display = 'block';
@@ -747,7 +850,12 @@
                 },
                 onScanSuccess,
                 onScanFailure
-            );
+            ).then(() => {
+                logDebug('Camera scanner started - ready to scan');
+            }).catch((err) => {
+                logDebug('Camera scanner failed to start: ' + err);
+                showError('Failed to start camera: ' + err);
+            });
         }
 
         function cleanup() {
@@ -863,11 +971,12 @@
         async function getBearer(email, secret) {
             const bearerEndpoint = getBearerEndpoint();
             if (!bearerEndpoint) {
-                showError('No Get Bearer URL configured. Set it under Endpoints on the setup screen.');
+                showError('No Get Bearer URL configured. Set it under Settings.');
                 return null;
             }
 
             try {
+                logDebug(`POST ${bearerEndpoint}`);
                 const response = await fetchWithTimeout(bearerEndpoint, {
                     method: 'POST',
                     headers: {
@@ -878,6 +987,7 @@
                         secret: secret
                     })
                 });
+                logDebug(`Get Bearer response status: ${response.status}`);
 
                 if (response.ok) {
                     const data = await response.json();
@@ -907,6 +1017,7 @@
                     throw new Error('Bearer token is required for call');
                 }
 
+                logDebug('GET https://orion.hogent.be/d2l/api/lp/1.43/users/whoami');
                 const response = await fetchWithTimeout('https://orion.hogent.be/d2l/api/lp/1.43/users/whoami', {
                     method: 'GET',
                     headers: {
@@ -914,6 +1025,7 @@
                         'Content-Type': 'application/json'
                     }
                 });
+                logDebug(`Whoami response status: ${response.status}`);
 
                 if (response.ok) {
                     const data = await response.json();
@@ -1258,7 +1370,8 @@
                             console.log('Auto-detected user:', data.UniqueName);
                             return await authenticateUser(data.UniqueName, savedSecret);
                         }
-                        document.getElementById('setupEmail').value = data.UniqueName;
+                        document.getElementById('settings_email').value = data.UniqueName;
+                        document.getElementById('settingsSection').open = true;
                     }
                 }
             } catch (e) {
@@ -1278,24 +1391,18 @@
         // Load saved email on page load
         window.onload = async function() {
             document.getElementById('appVersion').textContent = 'Build ' + APP_VERSION;
-            document.getElementById('setupGetBearerUrl').value = getBearerEndpoint();
-            document.getElementById('setupAnsStartTestUrl').value = getAnsStartTestEndpoint();
+            loadSettingsFields();
             if (!getBearerEndpoint()) {
-                document.getElementById('endpointsSection').open = true;
+                document.getElementById('settingsSection').open = true;
             }
 
             const autoSuccess = await tryAutoLogin();
-            
+
             if (!autoSuccess) {
-                const savedEmail = localStorage.getItem(GRADER_EMAIL_KEY);
-                if (savedEmail && !document.getElementById('setupEmail').value) {
-                    document.getElementById('setupEmail').value = savedEmail;
+                if (!localStorage.getItem(GRADER_EMAIL_KEY)) {
+                    document.getElementById('settingsSection').open = true;
                 }
-                const savedSecret = localStorage.getItem(GRADER_SECRET_KEY);
-                if (savedSecret) {
-                    document.getElementById('setupSecret').value = savedSecret;
-                }
-                document.getElementById('setupEmail').focus();
+                document.getElementById('settings_email').focus();
             }
         }
     </script>
