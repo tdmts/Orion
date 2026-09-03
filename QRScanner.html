@@ -918,8 +918,10 @@
                     return data;
                 } else {
                     const detail = await describeHttpError(response);
-                    if (response.status === 401 || response.status === 403) {
-                        showError('Orion rejected the bearer token (' + detail + '). The AccessToken stored for this account is expired or invalid - it needs to be refreshed in BrightspaceTokens.xlsx.');
+                    if (response.status === 401) {
+                        showError('Orion rejected the bearer token (' + detail + '). The AccessToken stored for this account is expired or malformed - it needs refreshing in BrightspaceTokens.xlsx.');
+                    } else if (response.status === 403) {
+                        showError('Orion accepted the bearer token but refused the call (' + detail + '). The token is valid, so this is a scope or permission problem: the stored token was minted without the scopes whoami needs (core:*:*), or this account lacks Brightspace API access.');
                     } else {
                         showError('Error getting user info: ' + detail);
                     }
