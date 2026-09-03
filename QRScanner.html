@@ -426,6 +426,27 @@
         }
 
         /**
+         * Builds a readable error string from a failed Response.
+         * statusText is always empty over HTTP/2, so the status code and the
+         * response body are the only useful signal.
+         * @param {Response} response - The failed fetch response
+         * @returns {Promise<string>} A human readable description
+         */
+        async function describeHttpError(response) {
+            let body = '';
+            try {
+                body = (await response.text()).trim();
+            } catch (e) {
+                body = '';
+            }
+            if (body.length > 300) {
+                body = body.slice(0, 300) + '...';
+            }
+            const status = `HTTP ${response.status}${response.statusText ? ' ' + response.statusText : ''}`;
+            return body ? `${status} - ${body}` : status;
+        }
+
+        /**
          * Sanitizes HTML to prevent XSS attacks
          * @param {string} html - The HTML string to sanitize
          * @returns {string} The sanitized HTML string
@@ -858,9 +879,13 @@
 
                 if (response.ok) {
                     const data = await response.json();
+                    if (!data.Bearer) {
+                        showError('The Get Bearer flow returned an empty token for ' + email + '. That means no row in BrightspaceTokens.xlsx matches this email + secret, or its AccessToken cell is empty.');
+                        return null;
+                    }
                     return data.Bearer;
                 } else {
-                    showError('Error getting bearer token: ' + response.statusText);
+                    showError('Error getting bearer token: ' + await describeHttpError(response));
                     return null;
                 }
             } catch (err) {
@@ -892,7 +917,12 @@
                     const data = await response.json();
                     return data;
                 } else {
-                    showError('Error getting user info: ' + response.statusText);
+                    const detail = await describeHttpError(response);
+                    if (response.status === 401 || response.status === 403) {
+                        showError('Orion rejected the bearer token (' + detail + '). The AccessToken stored for this account is expired or invalid - it needs to be refreshed in BrightspaceTokens.xlsx.');
+                    } else {
+                        showError('Error getting user info: ' + detail);
+                    }
                     return null;
                 }
             } catch (err) {
