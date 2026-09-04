@@ -277,7 +277,7 @@
         </details>
 
         <details>
-            <summary>⚙️ Settings</summary>
+            <summary>🎯 Assignment Info</summary>
             <div class="expandable-content">
                 <div class="form-row">
                     <div>
@@ -330,7 +330,7 @@
         </details>
 
         <details>
-            <summary>⚙️ Settings</summary>
+            <summary>🎯 Assignment Info</summary>
             <div class="expandable-content">
                 <div class="form-row">
                     <div>
@@ -379,7 +379,7 @@
         // CONFIGURATION - API URLs and Storage Keys
         // ====================================================================
 
-        const APP_VERSION = '2026-09-03 16:23'; // Build timestamp. Set to the current date and time when releasing.
+        const APP_VERSION = '2026-09-03 20:59'; // Build timestamp. Set to the current date and time when releasing.
 
         const ANS_BEARER_KEY = 'ans_bearer_token'; // Do not change. Used for localStorage key.
         const GRADER_EMAIL_KEY = 'grader_email'; // Do not change. Used for localStorage key.
@@ -664,22 +664,6 @@
             showResult('Settings saved. Use Change User if you updated the email or secret.', true, 'settings');
         }
 
-        function loadGraderEmail() {
-            const savedEmail = localStorage.getItem(GRADER_EMAIL_KEY);
-            if (savedEmail) {
-                document.getElementById('orion_email').value = savedEmail;
-                console.log('Grader email loaded from localStorage');
-            }
-        }
-
-        function saveGraderEmail() {
-            const emailValue = document.getElementById('orion_email').value;
-            if (emailValue) {
-                localStorage.setItem(GRADER_EMAIL_KEY, emailValue);
-                console.log('Grader email saved to localStorage');
-            }
-        }
-
         /**
          * Formats a Date object for datetime-local input field
          * @param {Date} date - The date to format
@@ -858,16 +842,28 @@
             });
         }
 
-        function cleanup() {
+        /**
+         * Stops and clears the active QR scanner instance, if any.
+         * Awaited before starting a new instance to avoid two scanners
+         * racing for the same camera/#reader element.
+         */
+        async function stopScanner() {
             if (html5QrCode && html5QrCode.isScanning) {
-                html5QrCode.stop().then(() => {
+                try {
+                    await html5QrCode.stop();
                     html5QrCode.clear();
-                });
+                } catch (err) {
+                    logDebug('Error stopping camera scanner: ' + err);
+                }
             }
         }
 
+        function cleanup() {
+            stopScanner();
+        }
+
         async function onScanSuccess(decodedText) {
-            html5QrCode.stop();
+            await stopScanner();
             document.getElementById('reader').style.display = 'none';
             document.getElementById('debugLog').innerHTML = '';
 
@@ -1321,7 +1317,7 @@
 
             const ansEndpoint = getAnsStartTestEndpoint();
             if (!ansEndpoint) {
-                showResult('No ANS Start Test URL configured. Set it under Endpoints on the setup screen.', false, 'ans');
+                showResult('No ANS Start Test URL configured. Set it under ⚙️ Settings.', false, 'ans');
                 return;
             }
 
@@ -1364,31 +1360,41 @@
          * @returns {Promise<boolean>} True if auto-login succeeded
          */
         async function tryAutoLogin() {
+            logDebug('Checking for an existing Brightspace session...');
+
             // Hide setup initially
             document.getElementById('emailSetup').style.display = 'none';
             showLoading('Checking user session...');
 
             try {
                 const response = await fetchWithTimeout('/d2l/api/lp/1.43/users/whoami');
+                logDebug(`Session whoami response status: ${response.status}`);
                 if (response.ok) {
                     const data = await response.json();
                     if (data.UniqueName) {
+                        logDebug('Existing session detected for: ' + data.UniqueName);
                         const savedSecret = localStorage.getItem(GRADER_SECRET_KEY);
                         if (savedSecret) {
+                            logDebug('Saved secret found - attempting auto-login');
                             console.log('Auto-detected user:', data.UniqueName);
                             return await authenticateUser(data.UniqueName, savedSecret);
                         }
+                        logDebug('No saved secret - falling back to manual entry');
                         document.getElementById('settings_email').value = data.UniqueName;
                         document.getElementById('settingsSection').open = true;
                     }
+                } else {
+                    logDebug('No existing Brightspace session');
                 }
             } catch (e) {
+                logDebug('Auto-login check failed: ' + e.message);
                 console.log('Auto-login check failed:', e);
             }
 
             // If we get here, auto-login failed
             hideLoading();
             document.getElementById('emailSetup').style.display = 'block';
+            logDebug('Auto-login did not complete - showing manual setup');
             return false;
         }
 
@@ -1398,9 +1404,11 @@
 
         // Load saved email on page load
         window.onload = async function() {
+            logDebug('Page loaded - Build ' + APP_VERSION);
             document.getElementById('appVersion').textContent = 'Build ' + APP_VERSION;
             loadSettingsFields();
             if (!getBearerEndpoint()) {
+                logDebug('No Get Bearer URL configured - opening Settings');
                 document.getElementById('settingsSection').open = true;
             }
 
@@ -1411,6 +1419,7 @@
                     document.getElementById('settingsSection').open = true;
                 }
                 document.getElementById('settings_email').focus();
+                logDebug('Waiting for manual Start Scanning');
             }
         }
     </script>
